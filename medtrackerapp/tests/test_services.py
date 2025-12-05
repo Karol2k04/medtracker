@@ -1,6 +1,8 @@
 from unittest.mock import patch
 from django.test import TestCase
 from medtrackerapp.models import Medication
+from medtrackerapp.services import DrugInfoService
+
 
 class DrugInfoMockTests(TestCase):
 
@@ -30,3 +32,50 @@ class DrugInfoMockTests(TestCase):
 
         self.assertIn("error", data)
         self.assertEqual(data["error"], "Boom!")
+
+    @patch("medtrackerapp.services.requests.get")
+    def test_successful_api_response(self, mock_get):
+        mock_get.return_value.status_code = 200
+        mock_get.return_value.json.return_value = {
+            "results": [
+                {
+                    "openfda": {
+                        "generic_name": ["Aspirin"],
+                        "manufacturer_name": ["Bayer"]
+                    },
+                    "warnings": ["Test warning"],
+                    "purpose": ["Pain relief"],
+                }
+            ]
+        }
+
+        data = DrugInfoService.get_drug_info("Aspirin")
+        self.assertEqual(data["name"], "Aspirin")
+        self.assertEqual(data["manufacturer"], "Bayer")
+        self.assertEqual(data["warnings"], ["Test warning"])
+        self.assertEqual(data["purpose"], ["Pain relief"])
+
+    @patch("medtrackerapp.services.requests.get")
+    def test_api_non_200_status(self, mock_get):
+        mock_get.return_value.status_code = 404
+        with self.assertRaises(ValueError):
+            DrugInfoService.get_drug_info("Aspirin")
+
+    @patch("medtrackerapp.services.requests.get")
+    def test_no_results(self, mock_get):
+        mock_get.return_value.status_code = 200
+        mock_get.return_value.json.return_value = {"results": []}
+
+        with self.assertRaises(ValueError):
+            DrugInfoService.get_drug_info("Aspirin")
+
+    @patch("medtrackerapp.services.requests.get")
+    def test_api_exception(self, mock_get):
+        mock_get.side_effect = Exception("Boom!")
+
+        with self.assertRaises(Exception):
+            DrugInfoService.get_drug_info("Aspirin")
+
+    def test_missing_drug_name(self):
+        with self.assertRaises(ValueError):
+            DrugInfoService.get_drug_info("")

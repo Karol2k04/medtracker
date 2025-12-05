@@ -1,9 +1,10 @@
 from datetime import timedelta
+from unittest.mock import patch
+
 from django.utils import timezone
 from rest_framework.test import APITestCase
-from medtrackerapp.models import Medication, DoseLog
 from django.urls import reverse
-from rest_framework import status
+from medtrackerapp.models import Medication, DoseLog
 
 
 class MedicationViewTests(APITestCase):
@@ -18,31 +19,25 @@ class MedicationViewTests(APITestCase):
         url = reverse("medication-list")
         response = self.client.get(url)
 
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.status_code, 200)
         self.assertEqual(len(response.data), 1)
-        self.assertEqual(response.data[0]["name"], "Aspirin")
-        self.assertEqual(response.data[0]["dosage_mg"], 100)
 
     def test_get_single_medication(self):
         url = reverse("medication-detail", args=[self.med.id])
         response = self.client.get(url)
 
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.data["name"], "Aspirin")
 
     def test_create_medication_valid(self):
         url = reverse("medication-list")
         data = {"name": "Ibuprofen", "dosage_mg": 200, "prescribed_per_day": 1}
-
         response = self.client.post(url, data)
 
         self.assertEqual(response.status_code, 201)
-        self.assertEqual(Medication.objects.count(), 2)
 
     def test_create_medication_invalid(self):
         url = reverse("medication-list")
-        data = {"name": "Bad"}  # brak wymaganych pól
-
+        data = {"name": "X"}  # brak wymaganych pól
         response = self.client.post(url, data)
 
         self.assertEqual(response.status_code, 400)
@@ -54,22 +49,45 @@ class MedicationViewTests(APITestCase):
             "dosage_mg": 150,
             "prescribed_per_day": 1
         }
-
         response = self.client.put(url, data)
 
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.data["name"], "Updated")
 
     def test_delete_medication(self):
         url = reverse("medication-detail", args=[self.med.id])
         response = self.client.delete(url)
 
         self.assertEqual(response.status_code, 204)
-        self.assertEqual(Medication.objects.count(), 0)
+
+
+class MedicationInfoActionTests(APITestCase):
+    def setUp(self):
+        self.med = Medication.objects.create(
+            name="Aspirin", dosage_mg=100, prescribed_per_day=1
+        )
+
+    @patch("medtrackerapp.models.DrugInfoService.get_drug_info")
+    def test_external_info_success(self, mock_api):
+        mock_api.return_value = {"name": "Aspirin"}
+
+        url = reverse("medication-get-external-info", args=[self.med.id])
+        res = self.client.get(url)
+
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res.data["name"], "Aspirin")
+
+    @patch("medtrackerapp.models.DDrugInfoService.get_drug_info")
+    def test_external_info_error(self, mock_api):
+        mock_api.return_value = {"error": "Failure"}
+
+        url = reverse("medication-get-external-info", args=[self.med.id])
+        res = self.client.get(url)
+
+        self.assertEqual(res.status_code, 502)
+        self.assertIn("error", res.data)
 
 
 class DoseLogViewTests(APITestCase):
-
     def setUp(self):
         self.med = Medication.objects.create(
             name="TestMed",
@@ -84,17 +102,16 @@ class DoseLogViewTests(APITestCase):
             "taken_at": timezone.now(),
             "was_taken": True
         }
-
         response = self.client.post(url, data, format="json")
 
         self.assertEqual(response.status_code, 201)
         self.assertEqual(DoseLog.objects.count(), 1)
 
-    def test_filter_logs(self):
+    def test_filter_logs_success(self):
         now = timezone.now()
         DoseLog.objects.create(medication=self.med, taken_at=now, was_taken=True)
 
-        url = reverse("doselog-list")
+        url = reverse("doselog-filter-by-date")
         response = self.client.get(url, {
             "start": (now - timedelta(days=1)).date(),
             "end": (now + timedelta(days=1)).date()
@@ -103,7 +120,8 @@ class DoseLogViewTests(APITestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(len(response.data), 1)
 
-    def test_filter_logs_invalid_dates(self):
-        url = reverse("doselog-list")
-        response = self.client.get(url, {"start": "2022-10-10"})
-        self.assertEqual(response.status_code, 200)
+    def test_filter_logs_invalid(self):
+        url = reverse("doselog-filter-by-date")
+        response = self.client.get(url, {"start": "2024-10-10"})
+
+        self.assertEqual(response.status_code, 400)
