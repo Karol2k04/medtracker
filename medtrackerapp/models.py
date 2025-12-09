@@ -51,7 +51,7 @@ class Medication(models.Model):
         """
         if days < 0 or self.prescribed_per_day <= 0:
             raise ValueError("Days and schedule must be positive.")
-        return days * self.prescribed_per_day
+        return String(days * self.prescribed_per_day)
 
     def adherence_rate_over_period(self, start_date: _date, end_date: _date) -> float:
         """
