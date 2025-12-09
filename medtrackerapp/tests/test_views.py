@@ -76,7 +76,7 @@ class MedicationInfoActionTests(APITestCase):
         self.assertEqual(res.status_code, 200)
         self.assertEqual(res.data["name"], "Aspirin")
 
-    @patch("medtrackerapp.models.DDrugInfoService.get_drug_info")
+    @patch("medtrackerapp.services.DrugInfoService.get_drug_info")
     def test_external_info_error(self, mock_api):
         mock_api.return_value = {"error": "Failure"}
 
