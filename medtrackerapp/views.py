@@ -1,6 +1,7 @@
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from rest_framework.exceptions import ValidationError
 from django.utils.dateparse import parse_date
 from .models import Medication, DoseLog
 from .serializers import MedicationSerializer, DoseLogSerializer
@@ -51,45 +52,65 @@ class MedicationViewSet(viewsets.ModelViewSet):
             return Response(data, status=status.HTTP_502_BAD_GATEWAY)
         return Response(data)
 
+    def _validate_positive_integer(self, param_name, param_value):
+        """
+        Validate that a query parameter is a positive integer.
+        
+        Args:
+            param_name (str): Name of the parameter for error messages.
+            param_value (str): The value to validate.
+            
+        Returns:
+            int: The validated positive integer.
+            
+        Raises:
+            ValidationError: If validation fails.
+        """
+        if not param_value:
+            raise ValidationError(f"{param_name} parameter is required")
+        
+        try:
+            value = int(param_value)
+            if value <= 0:
+                raise ValidationError(f"{param_name} must be a positive integer")
+            return value
+        except ValueError:
+            raise ValidationError(f"{param_name} must be a valid integer")
 
     @action(detail=True, methods=["get"], url_path="expected-doses")
     def expected_doses(self, request, pk=None):
-        """Calculate expected doses for a medication over a given number of days"""
+        """
+        Calculate expected doses for a medication over a given number of days.
+        
+        Query Parameters:
+            days (int): Number of days (must be positive integer).
+            
+        Args:
+            request (Request): The current HTTP request.
+            pk (int): Primary key of the medication record.
+            
+        Returns:
+            Response:
+                - 200 OK: Contains medication_id, days, and expected_doses.
+                - 400 BAD REQUEST: If days parameter is missing, invalid, or calculation fails.
+                
+        Example:
+            GET /medications/1/expected-doses/?days=7
+            Response: {"medication_id": 1, "days": 7, "expected_doses": 14}
+        """
         medication = self.get_object()
         
-        
-        days_param = request.query_params.get("days")
-        
-        
-        if not days_param:
-            return Response(
-                {"error": "days parameter is required"},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        
-        
         try:
-            days = int(days_param)
-            if days <= 0:
-                return Response(
-                    {"error": "days must be a positive integer"},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
-        except ValueError:
-            return Response(
-                {"error": "days must be a valid integer"},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        
-        
-        try:
+            days = self._validate_positive_integer("days", request.query_params.get("days"))
             expected = medication.expected_doses(days)
+            
             return Response({
                 "medication_id": medication.pk,
                 "days": days,
                 "expected_doses": expected
             }, status=status.HTTP_200_OK)
-        except ValueError as e:
+            
+        except (ValidationError, ValueError) as e:
             return Response(
                 {"error": str(e)},
                 status=status.HTTP_400_BAD_REQUEST
