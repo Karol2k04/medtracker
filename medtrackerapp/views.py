@@ -3,8 +3,8 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.exceptions import ValidationError
 from django.utils.dateparse import parse_date
-from .models import Medication, DoseLog
-from .serializers import MedicationSerializer, DoseLogSerializer
+from .models import Medication, DoseLog, DoctorNote
+from .serializers import MedicationSerializer, DoseLogSerializer, DoctorNoteSerializer
 
 class MedicationViewSet(viewsets.ModelViewSet):
     """
@@ -178,3 +178,48 @@ class DoseLogViewSet(viewsets.ModelViewSet):
 
         serializer = self.get_serializer(logs, many=True)
         return Response(serializer.data)
+
+
+class DoctorNoteViewSet(viewsets.ModelViewSet):
+    """
+    API endpoint for managing doctor's notes.
+
+    Provides operations to create, retrieve, list, and delete notes.
+    Updating notes is not supported (PUT/PATCH return 405).
+
+    Each note is associated with a medication and contains text observations
+    along with an auto-generated creation timestamp.
+
+    Endpoints:
+        - GET /notes/ — list all notes (ordered by creation date, newest first)
+        - POST /notes/ — create a new note
+        - GET /notes/{id}/ — retrieve a specific note
+        - DELETE /notes/{id}/ — delete a note
+
+    Query Parameters:
+        - medication: Filter notes by medication ID (e.g., ?medication=1)
+
+    Examples:
+        GET /api/notes/
+        GET /api/notes/?medication=5
+        POST /api/notes/ {"medication": 1, "text": "Patient responding well"}
+        DELETE /api/notes/3/
+    """
+    queryset = DoctorNote.objects.all()
+    serializer_class = DoctorNoteSerializer
+    http_method_names = ['get', 'post', 'delete', 'head', 'options']
+    
+    def get_queryset(self):
+        """
+        Optionally filter notes by medication ID.
+        
+        Returns:
+            QuerySet: Filtered or full list of notes.
+        """
+        queryset = super().get_queryset()
+        medication_id = self.request.query_params.get('medication')
+        
+        if medication_id is not None:
+            queryset = queryset.filter(medication_id=medication_id)
+        
+        return queryset
