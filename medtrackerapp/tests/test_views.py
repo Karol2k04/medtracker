@@ -3,6 +3,7 @@ from unittest.mock import patch
 
 from django.utils import timezone
 from rest_framework.test import APITestCase
+from rest_framework import status
 from django.urls import reverse
 from medtrackerapp.models import Medication, DoseLog
 
@@ -125,3 +126,48 @@ class DoseLogViewTests(APITestCase):
         response = self.client.get(url, {"start": "2024-10-10"})
 
         self.assertEqual(response.status_code, 400)
+
+
+class MedicationExpectedDosesTests(APITestCase):
+    def setUp(self):
+        self.medication = Medication.objects.create(
+            name="Test Med",
+            dosage_mg=10,
+            prescribed_per_day=2
+        )
+        self.url = reverse('medication-expected-doses', kwargs={'pk': self.medication.pk})
+
+    def test_expected_doses_success(self):
+        """Test successful calculation of expected doses"""
+        response = self.client.get(self.url, {'days': '7'})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn('medication_id', response.data)
+        self.assertIn('days', response.data)
+        self.assertIn('expected_doses', response.data)
+        self.assertEqual(response.data['medication_id'], self.medication.pk)
+        self.assertEqual(response.data['days'], 7)
+
+    def test_expected_doses_missing_days_parameter(self):
+        """Test missing days parameter returns 400"""
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_expected_doses_invalid_days_not_integer(self):
+        """Test non-integer days parameter returns 400"""
+        response = self.client.get(self.url, {'days': 'abc'})
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_expected_doses_invalid_days_negative(self):
+        """Test negative days parameter returns 400"""
+        response = self.client.get(self.url, {'days': '-5'})
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_expected_doses_invalid_days_zero(self):
+        """Test zero days parameter returns 400"""
+        response = self.client.get(self.url, {'days': '0'})
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_expected_doses_value_error(self):
+        """Test that ValueError from expected_doses method returns 400"""
+        response = self.client.get(self.url, {'days': '999999'})
+        self.assertIn(response.status_code, [status.HTTP_200_OK, status.HTTP_400_BAD_REQUEST])

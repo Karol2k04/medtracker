@@ -1,9 +1,10 @@
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from rest_framework.exceptions import ValidationError
 from django.utils.dateparse import parse_date
-from .models import Medication, DoseLog
-from .serializers import MedicationSerializer, DoseLogSerializer
+from .models import Medication, DoseLog, DoctorNote
+from .serializers import MedicationSerializer, DoseLogSerializer, DoctorNoteSerializer
 
 class MedicationViewSet(viewsets.ModelViewSet):
     """
@@ -51,6 +52,69 @@ class MedicationViewSet(viewsets.ModelViewSet):
             return Response(data, status=status.HTTP_502_BAD_GATEWAY)
         return Response(data)
 
+    def _validate_positive_integer(self, param_name, param_value):
+        """
+        Validate that a query parameter is a positive integer.
+        
+        Args:
+            param_name (str): Name of the parameter for error messages.
+            param_value (str): The value to validate.
+            
+        Returns:
+            int: The validated positive integer.
+            
+        Raises:
+            ValidationError: If validation fails.
+        """
+        if not param_value:
+            raise ValidationError(f"{param_name} parameter is required")
+        
+        try:
+            value = int(param_value)
+            if value <= 0:
+                raise ValidationError(f"{param_name} must be a positive integer")
+            return value
+        except ValueError:
+            raise ValidationError(f"{param_name} must be a valid integer")
+
+    @action(detail=True, methods=["get"], url_path="expected-doses")
+    def expected_doses(self, request, pk=None):
+        """
+        Calculate expected doses for a medication over a given number of days.
+        
+        Query Parameters:
+            days (int): Number of days (must be positive integer).
+            
+        Args:
+            request (Request): The current HTTP request.
+            pk (int): Primary key of the medication record.
+            
+        Returns:
+            Response:
+                - 200 OK: Contains medication_id, days, and expected_doses.
+                - 400 BAD REQUEST: If days parameter is missing, invalid, or calculation fails.
+                
+        Example:
+            GET /medications/1/expected-doses/?days=7
+            Response: {"medication_id": 1, "days": 7, "expected_doses": 14}
+        """
+        medication = self.get_object()
+        
+        try:
+            days = self._validate_positive_integer("days", request.query_params.get("days"))
+            expected = medication.expected_doses(days)
+            
+            return Response({
+                "medication_id": medication.pk,
+                "days": days,
+                "expected_doses": expected
+            }, status=status.HTTP_200_OK)
+            
+        except (ValidationError, ValueError) as e:
+            return Response(
+                {"error": str(e)},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
 class DoseLogViewSet(viewsets.ModelViewSet):
     """
@@ -114,3 +178,48 @@ class DoseLogViewSet(viewsets.ModelViewSet):
 
         serializer = self.get_serializer(logs, many=True)
         return Response(serializer.data)
+
+
+class DoctorNoteViewSet(viewsets.ModelViewSet):
+    """
+    API endpoint for managing doctor's notes.
+
+    Provides operations to create, retrieve, list, and delete notes.
+    Updating notes is not supported (PUT/PATCH return 405).
+
+    Each note is associated with a medication and contains text observations
+    along with an auto-generated creation timestamp.
+
+    Endpoints:
+        - GET /notes/ — list all notes (ordered by creation date, newest first)
+        - POST /notes/ — create a new note
+        - GET /notes/{id}/ — retrieve a specific note
+        - DELETE /notes/{id}/ — delete a note
+
+    Query Parameters:
+        - medication: Filter notes by medication ID (e.g., ?medication=1)
+
+    Examples:
+        GET /api/notes/
+        GET /api/notes/?medication=5
+        POST /api/notes/ {"medication": 1, "text": "Patient responding well"}
+        DELETE /api/notes/3/
+    """
+    queryset = DoctorNote.objects.all()
+    serializer_class = DoctorNoteSerializer
+    http_method_names = ['get', 'post', 'delete', 'head', 'options']
+    
+    def get_queryset(self):
+        """
+        Optionally filter notes by medication ID.
+        
+        Returns:
+            QuerySet: Filtered or full list of notes.
+        """
+        queryset = super().get_queryset()
+        medication_id = self.request.query_params.get('medication')
+        
+        if medication_id is not None:
+            queryset = queryset.filter(medication_id=medication_id)
+        
+        return queryset
