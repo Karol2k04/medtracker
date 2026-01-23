@@ -2,6 +2,7 @@ from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.exceptions import ValidationError
+from rest_framework.filters import SearchFilter
 from django.utils.dateparse import parse_date
 from .models import Medication, DoseLog, DoctorNote
 from .serializers import MedicationSerializer, DoseLogSerializer, DoctorNoteSerializer
@@ -198,16 +199,20 @@ class DoctorNoteViewSet(viewsets.ModelViewSet):
 
     Query Parameters:
         - medication: Filter notes by medication ID (e.g., ?medication=1)
+        - search: Search notes by medication name (e.g., ?search=aspirin)
 
     Examples:
         GET /api/notes/
         GET /api/notes/?medication=5
+        GET /api/notes/?search=aspirin
         POST /api/notes/ {"medication": 1, "text": "Patient responding well"}
         DELETE /api/notes/3/
     """
     queryset = DoctorNote.objects.all()
     serializer_class = DoctorNoteSerializer
     http_method_names = ['get', 'post', 'delete', 'head', 'options']
+    filter_backends = (SearchFilter,)
+    search_fields = ['medication__name']
     
     def get_queryset(self):
         """
