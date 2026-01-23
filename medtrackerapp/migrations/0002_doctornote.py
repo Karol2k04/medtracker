@@ -5,22 +5,36 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('medtrackerapp', '0001_initial'),
+        ("medtrackerapp", "0001_initial"),
     ]
 
     operations = [
         migrations.CreateModel(
-            name='DoctorNote',
+            name="DoctorNote",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('text', models.TextField()),
-                ('created_at', models.DateTimeField(auto_now_add=True)),
-                ('medication', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='notes', to='medtrackerapp.medication')),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                ("text", models.TextField()),
+                ("created_at", models.DateTimeField(auto_now_add=True)),
+                (
+                    "medication",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="notes",
+                        to="medtrackerapp.medication",
+                    ),
+                ),
             ],
             options={
-                'ordering': ['-created_at'],
+                "ordering": ["-created_at"],
             },
         ),
     ]

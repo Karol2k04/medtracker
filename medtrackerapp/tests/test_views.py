@@ -11,9 +11,7 @@ from medtrackerapp.models import Medication, DoseLog
 class MedicationViewTests(APITestCase):
     def setUp(self):
         self.med = Medication.objects.create(
-            name="Aspirin",
-            dosage_mg=100,
-            prescribed_per_day=2
+            name="Aspirin", dosage_mg=100, prescribed_per_day=2
         )
 
     def test_list_medications_valid_data(self):
@@ -45,11 +43,7 @@ class MedicationViewTests(APITestCase):
 
     def test_update_medication(self):
         url = reverse("medication-detail", args=[self.med.id])
-        data = {
-            "name": "Updated",
-            "dosage_mg": 150,
-            "prescribed_per_day": 1
-        }
+        data = {"name": "Updated", "dosage_mg": 150, "prescribed_per_day": 1}
         response = self.client.put(url, data)
 
         self.assertEqual(response.status_code, 200)
@@ -91,9 +85,7 @@ class MedicationInfoActionTests(APITestCase):
 class DoseLogViewTests(APITestCase):
     def setUp(self):
         self.med = Medication.objects.create(
-            name="TestMed",
-            dosage_mg=50,
-            prescribed_per_day=1
+            name="TestMed", dosage_mg=50, prescribed_per_day=1
         )
 
     def test_create_log(self):
@@ -101,7 +93,7 @@ class DoseLogViewTests(APITestCase):
         data = {
             "medication": self.med.id,
             "taken_at": timezone.now(),
-            "was_taken": True
+            "was_taken": True,
         }
         response = self.client.post(url, data, format="json")
 
@@ -113,10 +105,13 @@ class DoseLogViewTests(APITestCase):
         DoseLog.objects.create(medication=self.med, taken_at=now, was_taken=True)
 
         url = reverse("doselog-filter-by-date")
-        response = self.client.get(url, {
-            "start": (now - timedelta(days=1)).date(),
-            "end": (now + timedelta(days=1)).date()
-        })
+        response = self.client.get(
+            url,
+            {
+                "start": (now - timedelta(days=1)).date(),
+                "end": (now + timedelta(days=1)).date(),
+            },
+        )
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(len(response.data), 1)
@@ -131,21 +126,21 @@ class DoseLogViewTests(APITestCase):
 class MedicationExpectedDosesTests(APITestCase):
     def setUp(self):
         self.medication = Medication.objects.create(
-            name="Test Med",
-            dosage_mg=10,
-            prescribed_per_day=2
+            name="Test Med", dosage_mg=10, prescribed_per_day=2
         )
-        self.url = reverse('medication-expected-doses', kwargs={'pk': self.medication.pk})
+        self.url = reverse(
+            "medication-expected-doses", kwargs={"pk": self.medication.pk}
+        )
 
     def test_expected_doses_success(self):
         """Test successful calculation of expected doses"""
-        response = self.client.get(self.url, {'days': '7'})
+        response = self.client.get(self.url, {"days": "7"})
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertIn('medication_id', response.data)
-        self.assertIn('days', response.data)
-        self.assertIn('expected_doses', response.data)
-        self.assertEqual(response.data['medication_id'], self.medication.pk)
-        self.assertEqual(response.data['days'], 7)
+        self.assertIn("medication_id", response.data)
+        self.assertIn("days", response.data)
+        self.assertIn("expected_doses", response.data)
+        self.assertEqual(response.data["medication_id"], self.medication.pk)
+        self.assertEqual(response.data["days"], 7)
 
     def test_expected_doses_missing_days_parameter(self):
         """Test missing days parameter returns 400"""
@@ -154,20 +149,22 @@ class MedicationExpectedDosesTests(APITestCase):
 
     def test_expected_doses_invalid_days_not_integer(self):
         """Test non-integer days parameter returns 400"""
-        response = self.client.get(self.url, {'days': 'abc'})
+        response = self.client.get(self.url, {"days": "abc"})
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_expected_doses_invalid_days_negative(self):
         """Test negative days parameter returns 400"""
-        response = self.client.get(self.url, {'days': '-5'})
+        response = self.client.get(self.url, {"days": "-5"})
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_expected_doses_invalid_days_zero(self):
         """Test zero days parameter returns 400"""
-        response = self.client.get(self.url, {'days': '0'})
+        response = self.client.get(self.url, {"days": "0"})
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_expected_doses_value_error(self):
         """Test that ValueError from expected_doses method returns 400"""
-        response = self.client.get(self.url, {'days': '999999'})
-        self.assertIn(response.status_code, [status.HTTP_200_OK, status.HTTP_400_BAD_REQUEST])
+        response = self.client.get(self.url, {"days": "999999"})
+        self.assertIn(
+            response.status_code, [status.HTTP_200_OK, status.HTTP_400_BAD_REQUEST]
+        )

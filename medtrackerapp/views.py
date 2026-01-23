@@ -7,6 +7,7 @@ from django.utils.dateparse import parse_date
 from .models import Medication, DoseLog, DoctorNote
 from .serializers import MedicationSerializer, DoseLogSerializer, DoctorNoteSerializer
 
+
 class MedicationViewSet(viewsets.ModelViewSet):
     """
     API endpoint for viewing and managing medications.
@@ -23,6 +24,7 @@ class MedicationViewSet(viewsets.ModelViewSet):
         - DELETE /medications/{id}/ — delete a medication
         - GET /medications/{id}/info/ — fetch external drug info from OpenFDA
     """
+
     queryset = Medication.objects.all()
     serializer_class = MedicationSerializer
 
@@ -56,20 +58,20 @@ class MedicationViewSet(viewsets.ModelViewSet):
     def _validate_positive_integer(self, param_name, param_value):
         """
         Validate that a query parameter is a positive integer.
-        
+
         Args:
             param_name (str): Name of the parameter for error messages.
             param_value (str): The value to validate.
-            
+
         Returns:
             int: The validated positive integer.
-            
+
         Raises:
             ValidationError: If validation fails.
         """
         if not param_value:
             raise ValidationError(f"{param_name} parameter is required")
-        
+
         try:
             value = int(param_value)
             if value <= 0:
@@ -82,40 +84,43 @@ class MedicationViewSet(viewsets.ModelViewSet):
     def expected_doses(self, request, pk=None):
         """
         Calculate expected doses for a medication over a given number of days.
-        
+
         Query Parameters:
             days (int): Number of days (must be positive integer).
-            
+
         Args:
             request (Request): The current HTTP request.
             pk (int): Primary key of the medication record.
-            
+
         Returns:
             Response:
                 - 200 OK: Contains medication_id, days, and expected_doses.
                 - 400 BAD REQUEST: If days parameter is missing, invalid, or calculation fails.
-                
+
         Example:
             GET /medications/1/expected-doses/?days=7
             Response: {"medication_id": 1, "days": 7, "expected_doses": 14}
         """
         medication = self.get_object()
-        
+
         try:
-            days = self._validate_positive_integer("days", request.query_params.get("days"))
-            expected = medication.expected_doses(days)
-            
-            return Response({
-                "medication_id": medication.pk,
-                "days": days,
-                "expected_doses": expected
-            }, status=status.HTTP_200_OK)
-            
-        except (ValidationError, ValueError) as e:
-            return Response(
-                {"error": str(e)},
-                status=status.HTTP_400_BAD_REQUEST
+            days = self._validate_positive_integer(
+                "days", request.query_params.get("days")
             )
+            expected = medication.expected_doses(days)
+
+            return Response(
+                {
+                    "medication_id": medication.pk,
+                    "days": days,
+                    "expected_doses": expected,
+                },
+                status=status.HTTP_200_OK,
+            )
+
+        except (ValidationError, ValueError) as e:
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
 
 class DoseLogViewSet(viewsets.ModelViewSet):
     """
@@ -134,6 +139,7 @@ class DoseLogViewSet(viewsets.ModelViewSet):
         - GET /logs/filter/?start=YYYY-MM-DD&end=YYYY-MM-DD —
           filter logs within a date range
     """
+
     queryset = DoseLog.objects.all()
     serializer_class = DoseLogSerializer
 
@@ -159,8 +165,10 @@ class DoseLogViewSet(viewsets.ModelViewSet):
 
         if not start_str or not end_str:
             return Response(
-                {"error": "Both 'start' and 'end' query parameters are required and must be valid dates."},
-                status=status.HTTP_400_BAD_REQUEST
+                {
+                    "error": "Both 'start' and 'end' query parameters are required and must be valid dates."
+                },
+                status=status.HTTP_400_BAD_REQUEST,
             )
 
         start = parse_date(start_str)
@@ -168,14 +176,17 @@ class DoseLogViewSet(viewsets.ModelViewSet):
 
         if not start or not end:
             return Response(
-                {"error": "Both 'start' and 'end' query parameters are required and must be valid dates."},
-                status=status.HTTP_400_BAD_REQUEST
+                {
+                    "error": "Both 'start' and 'end' query parameters are required and must be valid dates."
+                },
+                status=status.HTTP_400_BAD_REQUEST,
             )
 
-        logs = self.get_queryset().filter(
-            taken_at__date__gte=start,
-            taken_at__date__lte=end
-        ).order_by("taken_at")
+        logs = (
+            self.get_queryset()
+            .filter(taken_at__date__gte=start, taken_at__date__lte=end)
+            .order_by("taken_at")
+        )
 
         serializer = self.get_serializer(logs, many=True)
         return Response(serializer.data)
@@ -208,23 +219,24 @@ class DoctorNoteViewSet(viewsets.ModelViewSet):
         POST /api/notes/ {"medication": 1, "text": "Patient responding well"}
         DELETE /api/notes/3/
     """
+
     queryset = DoctorNote.objects.all()
     serializer_class = DoctorNoteSerializer
-    http_method_names = ['get', 'post', 'delete', 'head', 'options']
+    http_method_names = ["get", "post", "delete", "head", "options"]
     filter_backends = (SearchFilter,)
-    search_fields = ['medication__name']
-    
+    search_fields = ["medication__name"]
+
     def get_queryset(self):
         """
         Optionally filter notes by medication ID.
-        
+
         Returns:
             QuerySet: Filtered or full list of notes.
         """
         queryset = super().get_queryset()
-        medication_id = self.request.query_params.get('medication')
-        
+        medication_id = self.request.query_params.get("medication")
+
         if medication_id is not None:
             queryset = queryset.filter(medication_id=medication_id)
-        
+
         return queryset
