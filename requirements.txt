@@ -6,3 +6,4 @@ python-dotenv
 requests
 coverage
 pytest
+ruff>=0.14.14
