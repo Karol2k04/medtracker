@@ -1,6 +1,7 @@
 from rest_framework import serializers
 from .models import Medication, DoseLog, DoctorNote
 
+
 class MedicationSerializer(serializers.ModelSerializer):
     adherence = serializers.SerializerMethodField()
 
@@ -21,26 +22,26 @@ class DoseLogSerializer(serializers.ModelSerializer):
 class DoctorNoteSerializer(serializers.ModelSerializer):
     """
     Serializer for DoctorNote model.
-    
+
     Handles validation and serialization of doctor's notes.
     The created_at field is read-only and auto-generated.
     """
-    
+
     class Meta:
         model = DoctorNote
         fields = ["id", "medication", "text", "created_at"]
         read_only_fields = ["created_at"]
-    
+
     def validate_text(self, value):
         """
         Validate that note text is not empty or just whitespace.
-        
+
         Args:
             value (str): The text content of the note.
-            
+
         Returns:
             str: The validated text.
-            
+
         Raises:
             serializers.ValidationError: If text is empty or whitespace only.
         """
